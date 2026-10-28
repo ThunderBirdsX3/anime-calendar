@@ -2,7 +2,7 @@
 
 เว็บตารางฉายอนิเมะแบบเบา ๆ สำหรับดูตั้งแต่วันนี้ไปอีก 6 วัน และอนิเมะที่จะเริ่มฉายในซีซั่นถัดไป แสดงเวลาไทย (`Asia/Bangkok`) ไม่มีหน้าดูย้อนหลัง
 
-ใช้ **Bun 1.3.10+, HTML/CSS/JavaScript และ SQLite** ไม่มี runtime dependencies ไม่มี frontend framework ไม่มี build step และไม่ต้องใช้ API key
+ใช้ **Bun 1.4.4+, HTML/CSS/JavaScript และ SQLite** ไม่มี runtime dependencies ไม่มี frontend framework ไม่มี build step และไม่ต้องใช้ API key
 
 ## เริ่มใช้งาน
 
@@ -99,7 +99,7 @@ docker compose up -d --build
 
 เปิด http://localhost:3000 หรือเปลี่ยนพอร์ตด้วย `PORT=4000 docker compose up -d --build`
 
-Image ใช้ `oven/bun:1.3.10-alpine` คัดลอกเฉพาะ `src/`, `public/` และ `package.json` ไม่มี `bun install`, `npm install`, `node_modules` หรือ build step เพราะใช้ API ที่มีใน runtime ทั้ง HTTP, fetch และ SQLite ขนาดแอปส่วน `src/` กับ `public/` รวมราว 230 KB ณ ตอนเขียนเอกสาร พื้นที่หลักของ image จึงเป็น Bun runtime และระบบฐาน ไม่รวมไฟล์ออกแบบ ทดสอบ หรือฐานข้อมูลจากเครื่องพัฒนา พื้นที่ Docker บน host ยังรวม image เก่าและ build cache ได้
+Image ใช้ `oven/bun:1.4.4-alpine` คัดลอกเฉพาะ `src/`, `public/` และ `package.json` ไม่มี `bun install`, `npm install`, `node_modules` หรือ build step เพราะใช้ API ที่มีใน runtime ทั้ง HTTP, fetch และ SQLite ขนาดแอปส่วน `src/` กับ `public/` รวมราว 230 KB ณ ตอนเขียนเอกสาร พื้นที่หลักของ image จึงเป็น Bun runtime และระบบฐาน ไม่รวมไฟล์ออกแบบ ทดสอบ หรือฐานข้อมูลจากเครื่องพัฒนา พื้นที่ Docker บน host ยังรวม image เก่าและ build cache ได้
 
 SQLite เก็บใน named volume `anime-data` ที่ mount `/app/data` ทั้งโฟลเดอร์เพื่อรองรับไฟล์ WAL/SHM ข้อมูลอยู่ต่อเมื่อสร้าง container ใหม่หรือใช้ `docker compose down` แต่ `docker compose down -v` จะลบ volume และข้อมูลด้วย ใช้เว็บหนึ่ง instance กับฐานข้อมูลนี้เพื่อให้มี scheduler ตัวเดียว
 

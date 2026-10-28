@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A small Thai anime calendar backed by AniList and SQLite",
-  "engines": { "bun": ">=1.3.10" },
+  "engines": { "bun": ">=1.4.4" },
   "scripts": {
     "dev": "bun --watch src/server.js",
     "start": "bun src/server.js",

@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.10-alpine
+FROM oven/bun:1.4.4-alpine
 
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATABASE_PATH=/app/data/anime.sqlite
 WORKDIR /app
