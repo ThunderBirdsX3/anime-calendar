@@ -1,6 +1,8 @@
 services:
   anime-calendar:
     build: .
+    environment:
+      SITE_URL: "${SITE_URL:-}"
     ports:
       - "${PORT:-3000}:3000"
     volumes:

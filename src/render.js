@@ -1,6 +1,7 @@
 import { dayKey, weekDays, nextSeason, thaiTime, TIME_ZONE, weekWindow } from './time.js';
 import { platformIcons, streamingLinks } from './platforms.js';
 import { airingState, nextAiringTime } from '../public/airing.js';
+import { pageSeo } from './seo.js';
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const e = escapeHtml;
 const icon = (name, size = 20) => {
@@ -56,11 +57,26 @@ function matches(media, event, params, now) {
   const text = [titleOf(media), media.title?.english, media.title?.native, ...(media.synonyms || [])].join(' ').toLowerCase();
   return (!params.q || text.includes(params.q.toLowerCase())) && (!params.format || media.format === params.format) && (!params.future || !event || event.airingAt * 1000 > now);
 }
-function shell(content, { upcoming, updatedAt, now, data, cacheMissing, error, key }) {
+function shell(content, { upcoming, updatedAt, now, data, cacheMissing, error, key, siteUrl, params, listedMedia }) {
   const update = updatedAt ? new Intl.DateTimeFormat('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: TIME_ZONE }).format(new Date(updatedAt)) : '';
   const stale = updatedAt && dayKey(updatedAt) !== dayKey(now);
   const banner = error ? `<div class="notice" role="status">${cacheMissing ? 'ยังเชื่อมต่อข้อมูลไม่ได้ กำลังลองใหม่อัตโนมัติ' : 'เชื่อมต่อแหล่งข้อมูลไม่ได้ชั่วคราว กำลังแสดงข้อมูลที่บันทึกไว้'}<button class="text-button" data-reload>ลองอีกครั้ง</button></div>` : cacheMissing ? `<div class="notice" role="status">กำลังโหลดข้อมูลจาก AniList ครั้งแรก หน้านี้จะอัปเดตให้อัตโนมัติ</div>` : stale ? `<div class="notice" role="status">ข้อมูลอาจยังไม่ล่าสุด กำลังอัปเดตเบื้องหลัง</div>` : '';
-  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#e9f3f5"><meta name="description" content="ตารางอนิเมะ 7 วัน เริ่มจากวันนี้ พร้อมอนิเมะซีซั่นถัดไป แสดงเวลาไทย เปิดเร็ว ค้นหาง่าย"><title>${upcoming ? 'Upcoming · อนิเมะซีซั่นหน้า' : 'ตารางฉายอนิเมะวันนี้'} | anime / calendar</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/app.js" type="module"></script></head>
+  const seo = pageSeo({ siteUrl, upcoming, now, params });
+  const graph = siteUrl && !cacheMissing ? { '@context': 'https://schema.org', '@graph': [
+    { '@type': 'WebSite', '@id': `${siteUrl}/#website`, url: `${siteUrl}/`, name: 'anime / calendar', inLanguage: 'th' },
+    { '@type': 'CollectionPage', '@id': `${seo.canonical}#webpage`, url: seo.canonical, name: seo.title, description: seo.description,
+      inLanguage: 'th', isPartOf: { '@id': `${siteUrl}/#website` }, mainEntity: {
+        '@type': 'ItemList', numberOfItems: listedMedia.length,
+        itemListElement: listedMedia.map((media, index) => ({ '@type': 'ListItem', position: index + 1,
+          item: { '@type': 'CreativeWork', name: titleOf(media), url: safeUrl(media.siteUrl) || `https://anilist.co/anime/${Number(media.id)}` } }))
+      } }
+  ] } : null;
+  const seoHead = `<title>${e(seo.title)}</title><meta name="description" content="${e(seo.description)}"><meta name="robots" content="${seo.robots}">
+    ${seo.canonical ? `<link rel="canonical" href="${e(seo.canonical)}"><meta property="og:url" content="${e(seo.canonical)}">` : ''}
+    <meta property="og:type" content="website"><meta property="og:locale" content="th_TH"><meta property="og:site_name" content="anime / calendar"><meta property="og:title" content="${e(seo.title)}"><meta property="og:description" content="${e(seo.description)}">
+    <meta name="twitter:card" content="summary"><meta name="twitter:title" content="${e(seo.title)}"><meta name="twitter:description" content="${e(seo.description)}">
+    ${graph ? `<script type="application/ld+json">${JSON.stringify(graph).replace(/</g, '\\u003c')}</script>` : ''}`;
+  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#e9f3f5">${seoHead}<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/app.js" type="module"></script></head>
     <body data-page="${upcoming ? 'upcoming' : 'calendar'}" data-day="${dayKey(now)}" data-cache-key="${e(key)}" data-updated="${updatedAt || 0}" data-missing="${cacheMissing ? 'true' : 'false'}"><a class="skip-link" href="#main">ข้ามไปเนื้อหา</a>
     <header class="header"><div class="header-inner"><a class="brand" href="/" aria-label="anime calendar หน้าหลัก">${icon('calendar', 27)}<span>anime <span class="brand-slash">/</span> calendar</span></a><nav aria-label="เมนูหลัก"><a href="/"${!upcoming ? ' aria-current="page"' : ''}>ตารางฉาย</a><a href="/upcoming"${upcoming ? ' aria-current="page"' : ''}>Upcoming</a></nav><span class="timezone">${icon('clock', 15)} เวลาไทย <span>· UTC+7</span></span></div></header>
     <main class="container" id="main">${banner}${content}</main>
@@ -68,7 +84,7 @@ function shell(content, { upcoming, updatedAt, now, data, cacheMissing, error, k
     <dialog id="detail-dialog" aria-labelledby="detail-title"><button class="dialog-close" aria-label="ปิดรายละเอียด">${icon('close', 22)}</button><div id="detail-content"></div></dialog>
     <script id="media-data" type="application/json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script></body></html>`;
 }
-export function renderPage({ snapshot, upcoming = false, now = Date.now(), error, params = {} }) {
+export function renderPage({ snapshot, upcoming = false, now = Date.now(), error, params = {}, siteUrl = null }) {
   params = { q: params.q || '', format: params.format || '', future: params.future || false };
   const days = weekDays(now);
   const season = nextSeason(now);
@@ -79,7 +95,7 @@ export function renderPage({ snapshot, upcoming = false, now = Date.now(), error
   const rows = (validSnapshot?.data || []).filter(row => upcoming || (row.airingAt >= start && row.airingAt < end));
   const filtered = rows.filter(row => matches(upcoming ? row : row.media, upcoming ? null : row, params, now));
   const nextAt = upcoming ? null : nextAiringTime(filtered.map(row => row.airingAt), now);
-  const title = upcoming ? 'ซีซั่นหน้า มีอะไรดู?' : 'วันนี้ ดูเรื่องไหนดี?';
+  const title = upcoming ? 'อนิเมะซีซั่นหน้า มีอะไรดู?' : 'ตารางฉายอนิเมะวันนี้';
   let content = `<section class="page-heading"><div><h1>${title}</h1><p>${upcoming ? 'อนิเมะที่กำลังจะเริ่มฉายในซีซั่นถัดไป เตรียมลิสต์เรื่องที่อยากดู' : 'ตารางอนิเมะประจำสัปดาห์ อัปเดตตามเวลาไทย'}</p></div>${upcoming ? `<span class="season-label">${icon('sparkles', 18)} ${season.season} ${season.year}</span>` : `<a href="#day-${days[0].key}" class="button today-button">${icon('calendar',16)} กลับมาวันนี้</a>`}</section>`;
   if (upcoming) {
     content += `<div class="season-strip"><span>${season.season} ${season.year}</span><span>${season.months}</span><span>เฉพาะเรื่องที่ยังไม่เริ่มฉาย</span></div>${controls(params, filtered.length, true)}<section class="upcoming-grid" aria-label="อนิเมะซีซั่นหน้า">${rows.map((m,index) => card(m,{ upcoming: true,index,now })).join('')}</section><div class="empty-state" id="no-results"${filtered.length ? ' hidden' : ''}>${icon('calendar',32)}<h2>${rows.length ? 'ไม่พบอนิเมะที่ค้นหา' : validSnapshot ? 'ยังไม่มีรายชื่อซีซั่นถัดไป' : 'รอข้อมูลซีซั่นถัดไปสักครู่'}</h2><p>${rows.length ? 'ลองเปลี่ยนคำค้นหาหรือประเภทอนิเมะ' : 'เมื่อแหล่งข้อมูลประกาศกำหนดการ รายชื่อจะปรากฏที่นี่'}</p></div>`;
@@ -102,5 +118,6 @@ export function renderPage({ snapshot, upcoming = false, now = Date.now(), error
     }
   }
   const data = Object.fromEntries(rows.map(row => { const m = upcoming ? row : row.media; return [m.id, { id:m.id,title:titleOf(m),english:m.title?.english,native:m.title?.native,cover:safeUrl(m.coverImage?.large,true),description:cleanDescription(m.description),genres:m.genres || [],studio:m.studios?.nodes?.map(s=>s.name).join(', '),format:m.format,episodes:m.episodes,platforms:streamingLinks(m),url:safeUrl(m.siteUrl) || `https://anilist.co/anime/${Number(m.id)}` }]; }));
-  return shell(content,{upcoming,now,updatedAt:validSnapshot?.updatedAt,data,cacheMissing:!validSnapshot,error,key});
+  const listedMedia = [...new Map(filtered.map(row => { const m = upcoming ? row : row.media; return [m.id, m]; })).values()];
+  return shell(content,{upcoming,now,updatedAt:validSnapshot?.updatedAt,data,cacheMissing:!validSnapshot,error,key,siteUrl,params,listedMedia});
 }

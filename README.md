@@ -82,6 +82,7 @@ API อาจเปลี่ยนกำหนดการได้ ดู [Airi
 | `PORT` | `3000` | พอร์ตเว็บ |
 | `HOST` | `127.0.0.1` | ที่อยู่สำหรับรับการเชื่อมต่อ |
 | `DATABASE_PATH` | `data/anime.sqlite` | ไฟล์ SQLite |
+| `SITE_URL` | ไม่กำหนด (โหมดพัฒนา ไม่ให้ index) | Origin ของเว็บจริง เช่น `https://anime.example` ใช้สร้าง canonical, sitemap และ structured data ต้องไม่มี path, query หรือ fragment |
 
 ตัวอย่าง:
 
@@ -90,6 +91,31 @@ PORT=4000 DATABASE_PATH=/path/to/anime.sqlite bun run start
 ```
 
 ใช้งานจริงบนเซิร์ฟเวอร์ Bun ที่มีพื้นที่เก็บข้อมูลถาวรได้ โดย mount โฟลเดอร์ SQLite และใช้ process manager ที่มีอยู่ให้โปรเซสทำงานต่อเนื่อง โปรเจกต์นี้ยังไม่ได้ deploy ไป hosting
+
+## SEO และการขึ้นผลค้นหา
+
+เว็บส่งตารางและรายชื่อจาก HTML ฝั่งเซิร์ฟเวอร์ จึงอ่านเนื้อหาได้แม้ไม่รัน JavaScript มี title และ description ภาษาไทยแยกแต่ละหน้า, หัวข้อ H1 ที่ระบุเนื้อหา, Open Graph/Twitter metadata และ JSON-LD (`WebSite`, `CollectionPage`, `ItemList`) ตามรายชื่อที่แสดงจริง ไม่สร้างคะแนนรีวิวหรือกำหนดฉายขึ้นเอง
+
+ก่อนเปิดให้ search engine เก็บข้อมูล ต้องตั้งโดเมนจริง:
+
+```sh
+SITE_URL=https://anime.example bun run start
+# หรือ
+SITE_URL=https://anime.example docker compose up -d --build
+```
+
+เปลี่ยน `anime.example` เป็นโดเมนที่ใช้งานจริงและเปิด HTTPS ผ่าน hosting/reverse proxy เว็บใช้ `SITE_URL` แทน Host header เพื่อไม่ให้ canonical ถูกเปลี่ยนจากคำขอภายนอก
+
+- `/robots.txt` เปิดให้บอตอ่านเว็บและระบุที่อยู่ sitemap เมื่อกำหนด `SITE_URL`
+- `/sitemap.xml` มีเฉพาะ `/` และ `/upcoming` ไม่ใส่ URL ค้นหา/ตัวกรองหรือหน้าซ้ำ และไม่สร้าง `lastmod` ที่ไม่ตรงการเปลี่ยนเนื้อหาจริง
+- `/calendar` ตอบ `301` ไป `/` พร้อมรักษาคำค้นหา เพื่อรวม URL หน้าตารางเป็นหน้าเดียว
+- หน้าที่มีคำค้นหาหรือตัวกรองใช้ `noindex, follow` และ canonical ไปหน้าหลักของเนื้อหานั้น ส่วน API และ health ใช้ `X-Robots-Tag: noindex`
+- ถ้ายังไม่มีแคชหรือ Upcoming เป็นซีซั่นเก่า หน้า HTML ตอบ `503` พร้อม `Retry-After` และยังแสดงสถานะโหลดแก่ผู้ใช้ เพื่อไม่ส่งหน้ารอข้อมูลเป็นเนื้อหาปกติให้บอต
+- เมื่อไม่กำหนด `SITE_URL` หน้าเว็บใช้ `noindex`, robots ปิดการ crawl และ sitemap ตอบ `503` เพื่อไม่เผยแพร่ URL ของเครื่องพัฒนาหรือโดเมนที่เดาจาก request
+
+หลัง deploy ให้ยืนยันโดเมนใน [Google Search Console](https://search.google.com/search-console/) แล้วส่ง `https://โดเมนจริง/sitemap.xml` ใช้ URL Inspection ตรวจหน้า `/` และ `/upcoming` และติดตามสถานะ index/คำค้นหา สามารถส่ง sitemap ให้ [Bing Webmaster Tools](https://www.bing.com/webmasters/) ได้ด้วย
+
+SEO ช่วยให้ค้นพบและเข้าใจเนื้อหา แต่ไม่รับประกันการ index หรืออันดับหน้าแรก ตาม [คู่มือ Google Search](https://developers.google.com/search/docs/fundamentals/seo-starter-guide) การแข่งขันอันดับยังต้องอาศัยเนื้อหาที่มีประโยชน์และแตกต่าง เช่น ข้อมูลชื่อไทยหรือเวลาฉายของแพลตฟอร์มไทยที่ตรวจสอบสิทธิ์และแหล่งที่มาแล้ว รวมถึงประสบการณ์ใช้งานและลิงก์อ้างอิงจากเว็บไซต์อื่น โค้ดนี้ไม่ได้เพิ่มข้อมูลที่ AniList ยังไม่ได้ยืนยัน
 
 ## Docker
 

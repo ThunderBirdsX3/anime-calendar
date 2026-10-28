@@ -9,7 +9,9 @@ import { renderPage } from './render.js';
 import { weekWindow, nextSeason } from './time.js';
 import { PLATFORM_BRANDS } from './platform-brands.js';
 import { isSnapshotFresh } from './freshness.js';
+import { normalizeSiteUrl, robotsTxt, sitemapXml } from './seo.js';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const siteUrl = normalizeSiteUrl(process.env.SITE_URL);
 const cache = openCache(resolve(process.env.DATABASE_PATH || resolve(ROOT, 'data/anime.sqlite')));
 const sync = createSync(cache);
 const assets = new Map([
@@ -41,7 +43,12 @@ const server = createServer((req, res) => {
       const assetCache = url.pathname === '/sakura-background.webp' ? { 'Cache-Control':'public, max-age=86400' } : {};
       return send(req,res,200,readFileSync(resolve(ROOT,'public',file)),type,assetCache);
     }
-    if (url.pathname === '/health') return send(req,res,200,JSON.stringify({ok:true}), 'application/json; charset=utf-8');
+    if (url.pathname === '/robots.txt') return send(req,res,200,robotsTxt(siteUrl),'text/plain; charset=utf-8');
+    if (url.pathname === '/sitemap.xml') return siteUrl
+      ? send(req,res,200,sitemapXml(siteUrl),'application/xml; charset=utf-8')
+      : send(req,res,503,'Set SITE_URL to the public origin before publishing the sitemap.','text/plain; charset=utf-8',{'Retry-After':'60','X-Robots-Tag':'noindex'});
+    if (url.pathname === '/calendar') return send(req,res,301,'','text/plain; charset=utf-8',{Location:`/${url.search}`});
+    if (url.pathname === '/health') return send(req,res,200,JSON.stringify({ok:true}), 'application/json; charset=utf-8',{'X-Robots-Tag':'noindex'});
     if (!['/', '/calendar', '/upcoming', '/api/calendar', '/api/upcoming'].includes(url.pathname)) return send(req,res,404,'<!doctype html><html lang="th"><meta charset="utf-8"><title>ไม่พบหน้า</title><body><h1>ไม่พบหน้านี้</h1><a href="/">กลับไปตารางฉาย</a></body></html>');
     const upcoming = url.pathname.endsWith('upcoming');
     const kind = upcoming ? 'upcoming' : 'calendar';
@@ -52,10 +59,11 @@ const server = createServer((req, res) => {
     const key = upcoming ? `${season.season}-${season.year}` : calendarKey;
     if (url.pathname.startsWith('/api/')) {
       const valid = snapshot && (!upcoming || snapshot.key === key);
-      return send(req,res,valid ? 200 : 503,JSON.stringify({ source:'AniList', timezone:'Asia/Bangkok', key, season:upcoming ? season : undefined, updatedAt:valid ? snapshot.updatedAt : null, stale:!isSnapshotFresh(valid ? snapshot : null, kind, now), syncing:sync.syncing, error:sync.error(kind) ? 'ข้อมูลจาก AniList ไม่พร้อมใช้งานชั่วคราว' : null, data:valid ? snapshot.data.filter(row=>upcoming || (row.airingAt >= start && row.airingAt < end)) : [] }), 'application/json; charset=utf-8', valid ? {} : {'Retry-After':'10'});
+      return send(req,res,valid ? 200 : 503,JSON.stringify({ source:'AniList', timezone:'Asia/Bangkok', key, season:upcoming ? season : undefined, updatedAt:valid ? snapshot.updatedAt : null, stale:!isSnapshotFresh(valid ? snapshot : null, kind, now), syncing:sync.syncing, error:sync.error(kind) ? 'ข้อมูลจาก AniList ไม่พร้อมใช้งานชั่วคราว' : null, data:valid ? snapshot.data.filter(row=>upcoming || (row.airingAt >= start && row.airingAt < end)) : [] }), 'application/json; charset=utf-8', {'X-Robots-Tag':'noindex',...(valid ? {} : {'Retry-After':'10'})});
     }
     const params = {q:(url.searchParams.get('q') || '').slice(0,200), format:url.searchParams.get('format') || '', future:url.searchParams.get('future') === '1'};
-    return send(req,res,200,renderPage({snapshot,upcoming,now,error:sync.error(kind),params}));
+    const valid = snapshot && (!upcoming || snapshot.key === key);
+    return send(req,res,valid ? 200 : 503,renderPage({snapshot,upcoming,now,error:sync.error(kind),params,siteUrl}), 'text/html; charset=utf-8',valid ? {} : {'Retry-After':'10'});
   } catch (error) {
     console.error('[request]', error.message);
     send(req,res,500,'เกิดข้อผิดพลาด กรุณาลองใหม่','text/plain; charset=utf-8');
@@ -63,7 +71,7 @@ const server = createServer((req, res) => {
 });
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || '127.0.0.1';
-server.listen(port,host,() => { console.log(`Anime calendar: http://${host}:${port}`); void sync.refresh(); });
+server.listen(port,host,() => { console.log(`Anime calendar: http://${host}:${server.address().port}`); void sync.refresh(); });
 const timer = setInterval(() => { void sync.refresh(); },60000);
 timer.unref();
 function stop() { clearInterval(timer); server.close(() => { cache.close(); process.exit(0); }); }
