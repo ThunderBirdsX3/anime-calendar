@@ -1,0 +1,40 @@
+# Dependencies and generated output (keep lockfiles in Git)
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+.cache/
+*.tsbuildinfo
+
+# Local SQLite data, including WAL/SHM and journal files
+data/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
+# Local environment, credentials, and logs
+.env
+.env.*
+!.env.example
+!.env.sample
+.aws/
+*.pem
+*.key
+logs/
+*.log
+
+# Machine/editor state
+.DS_Store
+.AppleDouble
+._*
+Thumbs.db
+.idea/
+.vscode/
+.codex/
+*.swp
+*.swo
+*~
